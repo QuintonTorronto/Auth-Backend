@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { UseGuards, Get, Req, Res } from '@nestjs/common';
@@ -25,17 +25,34 @@ export class AuthController {
   }
 
   @Post('login')
-  login(
+  async login(
     @Body() body: { email: string; password: string },
     @Res() res: Response,
   ) {
-    return this.authService.login(body.email, body.password, res);
+    const result = await this.authService.login(body.email, body.password, res);
+    return res.status(200).json(result);
+  }
+
+  @Post('send-otp-login')
+  sendOtpLogin(@Body() body: { email: string }) {
+    return this.authService.resendOtp(body.email);
+  }
+
+  @Post('verify-otp-login')
+  verifyOtpLogin(
+    @Body() body: { email: string; otp: string },
+    @Res() res: Response,
+  ) {
+    return this.authService.resendOtp(body.email);
   }
 
   @Post('refresh')
   refresh(@Req() req: Request, @Res() res: Response) {
-    const token = req.cookies['refresh_token'];
-    return this.authService.refreshToken(token, res);
+    const refreshToken = req.cookies?.refresh_token; // ⬅️ MUST come from cookie
+    if (!refreshToken) {
+      throw new UnauthorizedException('No refresh token provided');
+    }
+    return this.authService.refresh(refreshToken, res);
   }
 
   @Post('logout')

@@ -139,12 +139,12 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(
       { email: user.email, sub: user._id },
-      { expiresIn: '15m' },
+      { expiresIn: '15m', secret: process.env.ACCESS_SECRET },
     );
 
     const refreshToken = this.jwtService.sign(
       { email: user.email, sub: user._id },
-      { expiresIn: '7d' },
+      { expiresIn: '7d', secret: process.env.REFRESH_SECRET },
     );
 
     user.refreshTokens = [...(user.refreshTokens || []), refreshToken];
@@ -152,31 +152,31 @@ export class AuthService {
 
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+      secure: false, // true in production (with HTTPS)
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    return { accessToken };
+    return res.status(200).json({ accessToken });
   }
 
-  async refreshToken(refreshToken: string, res: Response) {
+  async refresh(refreshToken: string, res: Response) {
     try {
-      const payload = this.jwtService.verify(refreshToken);
-      const user = await this.userService.findByEmail(payload.email);
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: process.env.REFRESH_SECRET,
+      });
 
-      if (!user || !(user.refreshTokens || []).includes(refreshToken)) {
-        throw new UnauthorizedException();
-      }
+      const user = await this.userService.findById(payload.sub);
+      if (!user) throw new UnauthorizedException('User not found');
 
-      const newAccessToken = this.jwtService.sign(
-        { email: user.email, sub: user._id },
-        { expiresIn: '15m' },
+      const accessToken = this.jwtService.sign(
+        { userId: user._id },
+        { expiresIn: '15m', secret: process.env.ACCESS_SECRET },
       );
 
-      return { accessToken: newAccessToken };
-    } catch {
-      throw new UnauthorizedException();
+      return res.status(200).json({ accessToken });
+    } catch (err) {
+      throw new UnauthorizedException('Invalid refresh token');
     }
   }
 
