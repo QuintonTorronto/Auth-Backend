@@ -8,6 +8,7 @@ async function bootstrap() {
   app.enableCors({
     origin: 'http://localhost:5173', // your Vite frontend
     credentials: true, // for cookies (refresh token)
+    allowedHeaders: ['Content-Type', 'Authorization'], // ensure Authorization is allowed
   });
 
   app.setGlobalPrefix('api'); // using /api routes

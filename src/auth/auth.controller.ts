@@ -1,16 +1,25 @@
-import { Body, Controller, Post, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  UnauthorizedException,
+  UseGuards,
+  Get,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { UseGuards, Get, Req, Res } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
+import { CompleteProfileDto } from './dto/complete-profile.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('signup')
-  async signup(
+  signup(
     @Body()
     body: {
       email: string;
@@ -39,7 +48,7 @@ export class AuthController {
 
   @Post('send-otp-login')
   sendOtpLogin(@Body() body: { email: string }) {
-    return this.authService.sendOtpForLogin(body.email);
+    return this.authService.sendOtpLogin(body.email); // ✅ updated to match new name
   }
 
   @Post('verify-otp-login')
@@ -47,26 +56,30 @@ export class AuthController {
     @Body() body: { email: string; otp: string },
     @Res() res: Response,
   ) {
-    const result = await this.authService.verifyOtpForLogin(
-      body.email,
-      body.otp,
-      res,
-    );
-    return res.status(200).json(result);
+    return this.authService.verifyOtpLogin(body.email, body.otp, res); // ✅ name aligned
   }
 
   @Post('login')
   async login(
     @Body() body: { email: string; password: string },
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.login(body.email, body.password, res);
-    return res.status(200).json(result);
+    const { accessToken, refreshToken } = await this.authService.login(
+      body.email,
+      body.password,
+    );
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    return { accessToken };
   }
 
   @Post('refresh')
   refresh(@Req() req: Request, @Res() res: Response) {
-    const refreshToken = req.cookies?.refresh_token; // ⬅️ MUST come from cookie
+    const refreshToken = req.cookies?.refresh_token;
     if (!refreshToken) {
       throw new UnauthorizedException('No refresh token provided');
     }
@@ -91,12 +104,30 @@ export class AuthController {
     // Redirect handled by Passport
   }
 
+  @Post('google/token')
+  googleLoginWithToken(
+    @Body('credential') credential: string,
+    @Res() res: Response,
+  ) {
+    return this.authService.googleLoginWithCredential(credential, res);
+  }
+
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleCallback(@Req() req, @Res() res: Response) {
     const { email, oauthId } = req.user;
-    const result = await this.authService.googleLogin(email, oauthId, res);
+    const result = await this.authService.googleLoginCallback(
+      email,
+      oauthId,
+      res,
+    );
     return res.json(result);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  getProfile(@Req() req) {
+    return req.user;
   }
 
   @Post('forgot-password')
@@ -112,6 +143,16 @@ export class AuthController {
       body.email,
       body.otp,
       body.newPassword,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('complete-profile')
+  async completeProfile(@Req() req, @Body() body: CompleteProfileDto) {
+    return this.authService.completeProfile(
+      req.user.email,
+      body.name,
+      body.dob,
     );
   }
 }
