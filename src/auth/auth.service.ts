@@ -37,7 +37,11 @@ export class AuthService {
     return { message: 'OTP sent to email' };
   }
 
-  async sendOtpEmail(to: string, otp: string, context: 'signup' | 'reset') {
+  async sendOtpEmail(
+    to: string,
+    otp: string,
+    context: 'signup' | 'reset' | 'login',
+  ) {
     const emailUser = process.env.EMAIL_USER;
     const emailPass = process.env.EMAIL_PASS;
 
@@ -56,12 +60,18 @@ export class AuthService {
     });
 
     const subject =
-      context === 'signup' ? 'Email Verification Code' : 'Password Reset Code';
+      context === 'signup'
+        ? 'Email Verification Code'
+        : context === 'reset'
+          ? 'Password Reset Code'
+          : 'Login OTP Code';
 
     const text =
       context === 'signup'
         ? `Your verification code is ${otp}. It expires in 5 minutes.`
-        : `You requested to reset your password. Your OTP is ${otp}. It expires in 5 minutes.`;
+        : context === 'reset'
+          ? `You requested to reset your password. Your OTP is ${otp}. It expires in 5 minutes.`
+          : `Use this OTP to log in: ${otp}. It expires in 5 minutes.`;
 
     const mailOptions = {
       from: `"NoReply" <${emailUser}>`,
@@ -124,6 +134,65 @@ export class AuthService {
     await this.sendOtpEmail(user.email, otp, 'signup');
 
     return { message: 'New OTP sent to your email' };
+  }
+
+  async sendOtpForLogin(email: string) {
+    const user = await this.userService.findByEmail(email);
+    if (!user) throw new BadRequestException('User not found');
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+
+    user.otp = otp;
+    user.otpExpiresAt = otpExpiresAt;
+    await user.save();
+
+    await this.sendOtpEmail(user.email, otp, 'login');
+
+    return { message: 'OTP sent to email' };
+  }
+
+  async verifyOtpForLogin(email: string, otp: string, res: Response) {
+    const user = await this.userService.findByEmail(email);
+    if (!user) throw new BadRequestException('User not found');
+
+    if (
+      !user.otp ||
+      user.otp !== otp ||
+      !user.otpExpiresAt ||
+      user.otpExpiresAt.getTime() < Date.now()
+    ) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    // OTP is valid → clear it
+    user.otp = undefined;
+    user.otpExpiresAt = undefined;
+    user.isEmailVerified = true;
+    await user.save();
+
+    // Generate tokens
+    const accessToken = this.jwtService.sign(
+      { email: user.email, sub: user._id },
+      { expiresIn: '15m' },
+    );
+
+    const refreshToken = this.jwtService.sign(
+      { email: user.email, sub: user._id },
+      { expiresIn: '7d', secret: process.env.REFRESH_SECRET },
+    );
+
+    user.refreshTokens = [...(user.refreshTokens || []), refreshToken];
+    await user.save();
+
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({ accessToken });
   }
 
   async login(email: string, password: string, res: Response) {

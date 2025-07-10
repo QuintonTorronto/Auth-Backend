@@ -24,6 +24,24 @@ export class AuthController {
     return this.authService.resendOtp(body.email);
   }
 
+  @Post('send-otp-login')
+  sendOtpLogin(@Body() body: { email: string }) {
+    return this.authService.sendOtpForLogin(body.email);
+  }
+
+  @Post('verify-otp-login')
+  async verifyOtpLogin(
+    @Body() body: { email: string; otp: string },
+    @Res() res: Response,
+  ) {
+    const result = await this.authService.verifyOtpForLogin(
+      body.email,
+      body.otp,
+      res,
+    );
+    return res.status(200).json(result);
+  }
+
   @Post('login')
   async login(
     @Body() body: { email: string; password: string },
@@ -31,19 +49,6 @@ export class AuthController {
   ) {
     const result = await this.authService.login(body.email, body.password, res);
     return res.status(200).json(result);
-  }
-
-  @Post('send-otp-login')
-  sendOtpLogin(@Body() body: { email: string }) {
-    return this.authService.resendOtp(body.email);
-  }
-
-  @Post('verify-otp-login')
-  verifyOtpLogin(
-    @Body() body: { email: string; otp: string },
-    @Res() res: Response,
-  ) {
-    return this.authService.resendOtp(body.email);
   }
 
   @Post('refresh')
