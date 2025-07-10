@@ -18,7 +18,7 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async signup(email: string, password: string) {
+  async signup(email: string, password: string, name: string, dob: string) {
     const existing = await this.userService.findByEmail(email);
     if (existing) throw new BadRequestException('Email already exists');
 
@@ -27,8 +27,10 @@ export class AuthService {
     const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
     const user = await this.userService.create({
+      name,
       email,
       password: passwordHash,
+      dob: new Date(dob),
       otp,
       otpExpiresAt,
     });
