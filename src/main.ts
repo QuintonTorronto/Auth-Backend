@@ -6,12 +6,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(cookieParser());
   app.enableCors({
-    origin: 'http://localhost:5173', // frontend
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173', // frontend origin
     credentials: true, // for cookies (refresh token)
-    allowedHeaders: ['Content-Type', 'Authorization'], //this ensure Authorization is allowed
+    allowedHeaders: ['Content-Type', 'Authorization'], //ensures Authorization
   });
 
-  app.setGlobalPrefix('api'); // using /api routes
-  await app.listen(5000);
+  app.setGlobalPrefix('api'); // using /api
+  await app.listen(process.env.PORT || 5000);
 }
 bootstrap();
