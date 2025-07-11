@@ -5,5 +5,5 @@ export class CompleteProfileDto {
   name: string;
 
   @IsDateString()
-  dob: string; // Will be converted to Date in the service
+  dob: string;
 }

@@ -40,8 +40,7 @@ export class AuthService {
 
     user.refreshTokens = [...(user.refreshTokens || []), refreshToken];
 
-    // Save without validation in case profile is incomplete (dob missing)
-    await user.save({ validateBeforeSave: false }); //skip validation for google login profiles
+    await user.save({ validateBeforeSave: false }); //skiping validation for google login profiles.
 
     return { accessToken, refreshToken };
   }
@@ -187,7 +186,7 @@ export class AuthService {
     await user.save();
 
     const { accessToken, refreshToken } = await this.generateTokens(user);
-    this.setAuthCookies(res, refreshToken); // This sets refresh_token cookie
+    this.setAuthCookies(res, refreshToken); // sets refresh token cookie
     return { accessToken };
   }
 
@@ -262,7 +261,6 @@ export class AuthService {
 
       requiresProfileCompletion = true;
 
-      // Only save once — skip validation since dob is missing
       await user.save({ validateBeforeSave: false });
     }
 
@@ -287,7 +285,7 @@ export class AuthService {
     }
 
     user.name = name;
-    user.dob = new Date(dob); // validated in DTO
+    user.dob = new Date(dob);
     await user.save();
 
     return { message: 'Profile updated successfully' };
@@ -309,7 +307,7 @@ export class AuthService {
     }
 
     res.clearCookie('refresh_token');
-    return res.status(200).json({ message: 'Logged out' }); // <- ✅ return a proper JSON response
+    return res.status(200).json({ message: 'Logged out' });
   }
 
   async refresh(refreshToken: string, res: Response) {

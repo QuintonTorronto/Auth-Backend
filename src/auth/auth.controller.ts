@@ -48,20 +48,20 @@ export class AuthController {
 
   @Post('send-otp-login')
   sendOtpLogin(@Body() body: { email: string }) {
-    return this.authService.sendOtpLogin(body.email); // ✅ updated to match new name
+    return this.authService.sendOtpLogin(body.email);
   }
 
   @Post('verify-otp-login')
   async verifyOtpLogin(
     @Body() body: { email: string; otp: string },
-    @Res({ passthrough: true }) res: Response, // Allow setting cookies while returning JSON
+    @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken } = await this.authService.verifyOtpLogin(
       body.email,
       body.otp,
       res,
     );
-    return { accessToken }; // Return standard JSON response
+    return { accessToken };
   }
 
   @Post('login')
@@ -91,7 +91,6 @@ export class AuthController {
     return this.authService.refresh(refreshToken, res);
   }
 
-  // auth.controller.ts
   @Post('logout')
   logout(@Req() req: Request, @Res() res: Response) {
     const token = req.cookies['refresh_token'];

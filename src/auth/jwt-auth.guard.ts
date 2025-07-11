@@ -8,6 +8,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     if (err || !user) {
       throw new UnauthorizedException();
     }
-    return user; // Make user available in @Req()
+    return user;
   }
 }
