@@ -19,8 +19,8 @@ export class AuthService {
 
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
-    private userService: UserService,
-    private jwtService: JwtService,
+    private readonly userService: UserService,
+    private readonly jwtService: JwtService,
   ) {
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
     if (!googleClientId) throw new Error('GOOGLE_CLIENT_ID not defined');
@@ -296,7 +296,7 @@ export class AuthService {
   }
 
   async logout(refreshToken: string, res: Response) {
-    const payload = this.jwtService.decode(refreshToken) as any;
+    const payload = this.jwtService.decode(refreshToken);
     const user = await this.userService.findByEmail(payload?.email);
 
     if (user) {
@@ -319,14 +319,23 @@ export class AuthService {
       const user = await this.userService.findById(payload.sub);
       if (!user) throw new UnauthorizedException('User not found');
 
-      const accessToken = this.jwtService.sign(
+      const newAccessToken = this.jwtService.sign(
         { email: user.email, sub: user._id },
         { expiresIn: '15m', secret: process.env.ACCESS_SECRET },
       );
 
+      const newRefreshToken = this.jwtService.sign(
+        { email: user.email, sub: user._id },
+        { expiresIn: '7d', secret: process.env.REFRESH_SECRET },
+      );
+
+      this.setAuthCookies(res, newRefreshToken);
+
       const requiresProfileCompletion = !user.name || !user.dob;
 
-      return res.status(200).json({ accessToken, requiresProfileCompletion });
+      return res
+        .status(200)
+        .json({ accessToken: newAccessToken, requiresProfileCompletion });
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
