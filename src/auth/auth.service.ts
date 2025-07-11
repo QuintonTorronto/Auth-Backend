@@ -170,21 +170,24 @@ export class AuthService {
 
   async verifyOtpLogin(email: string, otp: string, res: Response) {
     const user = await this.userService.findByEmail(email);
-    if (
+
+    const isOtpInvalid =
       !user ||
       user.otp !== otp ||
       !user.otpExpiresAt ||
-      user.otpExpiresAt.getTime() < Date.now()
-    ) {
+      user.otpExpiresAt.getTime() < Date.now();
+
+    if (isOtpInvalid) {
       throw new BadRequestException('Invalid or expired OTP');
     }
+
     user.isEmailVerified = true;
     user.otp = undefined;
     user.otpExpiresAt = undefined;
     await user.save();
 
     const { accessToken, refreshToken } = await this.generateTokens(user);
-    this.setAuthCookies(res, refreshToken);
+    this.setAuthCookies(res, refreshToken); // This sets refresh_token cookie
     return { accessToken };
   }
 
@@ -290,17 +293,23 @@ export class AuthService {
     return { message: 'Profile updated successfully' };
   }
 
+  async getUserById(id: string) {
+    return this.userService.findById(id);
+  }
+
   async logout(refreshToken: string, res: Response) {
     const payload = this.jwtService.decode(refreshToken) as any;
     const user = await this.userService.findByEmail(payload?.email);
+
     if (user) {
       user.refreshTokens = (user.refreshTokens || []).filter(
         (t) => t !== refreshToken,
       );
       await user.save();
     }
+
     res.clearCookie('refresh_token');
-    return { message: 'Logged out' };
+    return res.status(200).json({ message: 'Logged out' }); // <- ✅ return a proper JSON response
   }
 
   async refresh(refreshToken: string, res: Response) {

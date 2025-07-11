@@ -54,9 +54,14 @@ export class AuthController {
   @Post('verify-otp-login')
   async verifyOtpLogin(
     @Body() body: { email: string; otp: string },
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response, // Allow setting cookies while returning JSON
   ) {
-    return this.authService.verifyOtpLogin(body.email, body.otp, res); // ✅ name aligned
+    const { accessToken } = await this.authService.verifyOtpLogin(
+      body.email,
+      body.otp,
+      res,
+    );
+    return { accessToken }; // Return standard JSON response
   }
 
   @Post('login')
@@ -86,6 +91,7 @@ export class AuthController {
     return this.authService.refresh(refreshToken, res);
   }
 
+  // auth.controller.ts
   @Post('logout')
   logout(@Req() req: Request, @Res() res: Response) {
     const token = req.cookies['refresh_token'];
@@ -126,8 +132,16 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  getProfile(@Req() req) {
-    return req.user;
+  async getProfile(@Req() req) {
+    const user = await this.authService.getUserById(req.user.userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return {
+      name: user.name,
+      email: user.email,
+    };
   }
 
   @Post('forgot-password')
